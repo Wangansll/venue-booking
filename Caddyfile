@@ -1,0 +1,21 @@
+﻿# 域名由 compose 的 DOMAIN 环境变量注入
+{$DOMAIN} {
+	encode zstd gzip
+
+	# 接口不缓存
+	@api path /api/*
+	header @api Cache-Control "no-store"
+
+	reverse_proxy app:8787 {
+		header_up X-Real-IP {remote_host}
+		header_up X-Forwarded-Proto {scheme}
+	}
+
+	# 上传目录单独放宽体积上限（默认 1MB 是 body 解析限制，这里给 nginx 层留余量）
+	request_body {
+		max_size 12MB
+	}
+
+	# TLS 由 Caddy 自动申请；邮箱用于证书到期提醒
+	tls {$ACME_EMAIL}
+}

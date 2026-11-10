@@ -1,0 +1,221 @@
+﻿openapi: 3.0.3
+info:
+  title: 校园场馆预约 API
+  version: 1.0.0
+  description: |
+    场馆官网与预约系统的 REST 接口。
+
+    - 统一响应：`{ code, msg, data, requestId }`，`code === 0` 表示成功
+    - 认证：`Authorization: Bearer <JWT>`
+    - 错误码见 `server/src/errors.js`
+servers:
+  - url: http://127.0.0.1:8787/api
+tags:
+  - name: auth
+  - name: venues
+  - name: bookings
+  - name: content
+  - name: admin
+paths:
+  /health:
+    get:
+      tags: [admin]
+      summary: 健康检查
+      responses:
+        '200': { description: OK }
+  /auth/login:
+    post:
+      tags: [auth]
+      summary: 登录
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username: { type: string, example: student }
+                password: { type: string, example: '123456' }
+      responses:
+        '200':
+          description: 返回 token 与用户信息
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      token: { type: string }
+                      user: { $ref: '#/components/schemas/User' }
+        '401': { description: 用户名或密码错误 }
+  /auth/me:
+    get:
+      tags: [auth]
+      summary: 当前登录用户
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: OK }
+  /home:
+    get:
+      tags: [content]
+      summary: 首页聚合（轮播 / 场馆 / 活动 / 新闻）
+      responses:
+        '200': { description: OK }
+  /articles:
+    get:
+      tags: [content]
+      summary: 内容列表（仅已发布）
+      parameters:
+        - { in: query, name: type, schema: { type: string, enum: [news, event] } }
+        - { in: query, name: page, schema: { type: integer, default: 1 } }
+        - { in: query, name: size, schema: { type: integer, default: 6 } }
+      responses:
+        '200': { description: OK }
+  /articles/{id}:
+    get:
+      tags: [content]
+      summary: 内容详情（草稿返回 404）
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: integer } }
+      responses:
+        '200': { description: OK }
+        '404': { description: 内容不存在 }
+  /messages:
+    post:
+      tags: [content]
+      summary: 提交留言
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, phone, content]
+              properties:
+                name: { type: string }
+                phone: { type: string }
+                email: { type: string }
+                content: { type: string, maxLength: 1000 }
+      responses:
+        '200': { description: 提交成功 }
+        '400': { description: 参数不合法 }
+  /venues:
+    get:
+      tags: [venues]
+      summary: 场馆列表
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: OK }
+  /venues/{id}/slots:
+    get:
+      tags: [venues]
+      summary: 某天时段状态
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: integer } }
+        - { in: query, name: date, required: true, schema: { type: string, format: date } }
+      responses:
+        '200': { description: OK }
+  /bookings:
+    post:
+      tags: [bookings]
+      summary: 提交预约（事务 + 唯一索引，冲突返回 409）
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [venueId, date, slot]
+              properties:
+                venueId: { type: integer }
+                date: { type: string, format: date }
+                slot: { type: integer, minimum: 1, maximum: 8 }
+                remark: { type: string }
+      responses:
+        '200': { description: 预约成功 }
+        '409': { description: 该时段已被占用 }
+  /bookings/mine:
+    get:
+      tags: [bookings]
+      summary: 我的有效预约
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: OK }
+  /bookings/{id}/cancel:
+    post:
+      tags: [bookings]
+      summary: 取消预约
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: integer } }
+      responses:
+        '200': { description: OK }
+  /admin/dashboard:
+    get:
+      tags: [admin]
+      summary: 后台概览
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: OK }
+  /admin/articles:
+    get:
+      tags: [admin]
+      summary: 内容列表（含草稿）
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: query, name: type, schema: { type: string, enum: [news, event] } }
+        - { in: query, name: status, schema: { type: string, enum: [draft, published] } }
+      responses:
+        '200': { description: OK }
+    post:
+      tags: [admin]
+      summary: 新建内容（草稿）
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: OK }
+  /admin/articles/{id}/publish:
+    post:
+      tags: [admin]
+      summary: 发布 / 转草稿
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: integer } }
+      responses:
+        '200': { description: OK }
+  /admin/messages:
+    get:
+      tags: [admin]
+      summary: 留言列表
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: OK }
+  /admin/upload:
+    post:
+      tags: [admin]
+      summary: 上传图片（png/jpg/webp/svg，≤5MB）
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file: { type: string, format: binary }
+      responses:
+        '200': { description: 返回 /uploads/xxx }
+components:
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT }
+  schemas:
+    User:
+      type: object
+      properties:
+        id: { type: integer }
+        username: { type: string }
+        name: { type: string }
+        role: { type: string, enum: [student, admin] }

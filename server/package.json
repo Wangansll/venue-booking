@@ -1,0 +1,29 @@
+{
+  "name": "venue-booking-server",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch src/index.js",
+    "start": "node src/index.js",
+    "seed": "node src/seed.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "loadtest": "node ../tools/loadtest.mjs --c=50 --n=2000",
+    "alert": "node ../tools/alert-check.mjs",
+    "alert:watch": "node ../tools/alert-check.mjs --watch=30"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "jsonwebtoken": "^9.0.2",
+    "multer": "^1.4.5-lts.1",
+    "mysql2": "^3.11.3",
+    "qrcode": "^1.5.4"
+  },
+  "devDependencies": {
+    "supertest": "^7.0.0",
+    "vitest": "^2.1.2"
+  }
+}

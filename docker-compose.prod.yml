@@ -1,0 +1,82 @@
+﻿# 生产部署：docker compose -f docker-compose.prod.yml up -d --build
+# 需要先在同目录创建 .env（见 .env.example），并把域名解析到本机公网 IP
+name: venue-booking
+
+services:
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASS:?请设置 DB_PASS}
+      MYSQL_DATABASE: ${DB_NAME:-venue_booking}
+    command: >
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_general_ci
+      --innodb-buffer-pool-size=256M
+      --max-connections=200
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-p${DB_PASS}"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    restart: unless-stopped
+
+  migrate:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    command: ["node", "src/migrate.js"]
+    environment: &env
+      NODE_ENV: production
+      DB_HOST: mysql
+      DB_PORT: "3306"
+      DB_USER: root
+      DB_PASS: ${DB_PASS:?请设置 DB_PASS}
+      DB_NAME: ${DB_NAME:-venue_booking}
+      JWT_SECRET: ${JWT_SECRET:?请设置 JWT_SECRET}
+      CORS_ORIGINS: ${CORS_ORIGINS:-}
+      PAY_PROVIDER: ${PAY_PROVIDER:-mock}
+      NOTIFY_PROVIDER: ${NOTIFY_PROVIDER:-console}
+      PUBLIC_DIR: /app/public
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  app:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    environment: *env
+    volumes:
+      - uploads:/app/uploads
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  # 只有需要「自有域名 + 自动 HTTPS」时才启用：
+  #   docker compose -f docker-compose.prod.yml --profile tls up -d
+  # 用 InstaBox 这类自带 HTTPS 的平台时不要带 --profile tls
+  caddy:
+    profiles: ["tls"]
+    image: caddy:2-alpine
+    environment:
+      DOMAIN: ${DOMAIN:-localhost}
+      ACME_EMAIL: ${ACME_EMAIL:-}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - app
+    restart: unless-stopped
+
+volumes:
+  mysql-data:
+  uploads:
+  caddy-data:
+  caddy-config:

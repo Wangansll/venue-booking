@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>定格动画龙 · 16 面向技术验证</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<style>
+  :root {
+    --bg: #0b0f17; --card: #141b26; --line: #23303f;
+    --ink: #e8eef7; --dim: #8b99ab; --acc: #4d8dff;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg); color: var(--ink);
+    font-family: "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
+    line-height: 1.7; -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 56px 24px 80px; }
+  .back { display: inline-block; font-size: 13px; color: var(--dim); text-decoration: none; margin-bottom: 28px; }
+  .back:hover { color: var(--acc); }
+  h1 { font-size: 30px; letter-spacing: -.01em; }
+  .sub { color: var(--dim); font-size: 14px; margin-top: 8px; }
+  .tags { display: flex; flex-wrap: wrap; gap: 8px; margin: 20px 0 8px; }
+  .tag {
+    font-size: 12px; color: var(--acc); background: rgba(77,141,255,.1);
+    border: 1px solid rgba(77,141,255,.28); padding: 3px 10px; border-radius: 999px;
+  }
+  .note {
+    background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+    padding: 18px 20px; margin: 26px 0 10px; font-size: 14px; color: #c3cedd;
+  }
+  .note b { color: var(--ink); }
+  .note code { font-family: ui-monospace, Consolas, monospace; font-size: 12.5px;
+    background: rgba(255,255,255,.06); padding: 1px 5px; border-radius: 4px; }
+  h2 { font-size: 15px; color: var(--dim); font-weight: 600; letter-spacing: .12em;
+       margin: 40px 0 16px; text-transform: uppercase; }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  figure { background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+           overflow: hidden; cursor: zoom-in; transition: border-color .2s, transform .2s; }
+  figure:hover { border-color: var(--acc); transform: translateY(-2px); }
+  figure img { width: 100%; height: auto; display: block; background: #0f1520; }
+  figcaption { font-size: 12px; color: var(--dim); padding: 9px 12px; }
+  .lightbox {
+    position: fixed; inset: 0; background: rgba(4,7,12,.94); z-index: 50;
+    display: none; place-items: center; padding: 32px; cursor: zoom-out;
+  }
+  .lightbox.on { display: grid; }
+  .lightbox img { max-width: 100%; max-height: 88vh; border-radius: 8px; }
+  footer { margin-top: 56px; padding-top: 20px; border-top: 1px solid var(--line);
+           font-size: 12.5px; color: var(--dim); display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  footer a { color: var(--acc); text-decoration: none; }
+  @media (max-width: 760px) { .grid { grid-template-columns: 1fr 1fr; } h1 { font-size: 23px; } .wrap { padding: 36px 18px 60px; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back" href="/">← 返回校园场馆</a>
+
+  <h1>定格动画龙 · 16 面向技术验证</h1>
+  <p class="sub">用 Blender 脚本把 3D 龙渲染成 16 个定角帧，前端按方向切帧播放——不写 shader，也不实时跑 3D。</p>
+
+  <div class="tags">
+    <span class="tag">Blender bpy 脚本</span>
+    <span class="tag">骨骼绑定 · 权重</span>
+    <span class="tag">部位染色校验</span>
+    <span class="tag">16 面定帧</span>
+  </div>
+
+  <div class="note">
+    <b>这一页在看什么。</b>
+    下面是建模管线的中间产物，不是成片。颜色不是装饰——<b>每个部位染一色</b>，
+    是为了在渲染图里一眼看出骨骼有没有带错、权重有没有糊到邻块。
+    这套校验跑通之后，才敢让脚本批量出 16 张定角帧。
+    <br><br>
+    <b>为什么用定帧而不是实时 3D。</b>
+    展演场景是固定机位、固定姿态，实时渲染要背 <code>three.js</code> + 贴图 + 显存，
+    换来的自由度用不上。16 张 320×198 的帧一共 <b>766 KB</b>，切换就是换图，没有加载等待。
+  </div>
+
+  <h2>骨骼与权重校验</h2>
+  <div class="grid" id="g1"></div>
+
+  <h2>部位染色：确认每块归谁管</h2>
+  <div class="grid" id="g2"></div>
+
+  <h2>几何与整体</h2>
+  <div class="grid" id="g3"></div>
+
+  <footer>
+    <span>素材：Blender 渲染中间产物 · 已压缩至 720px 用于网页展示</span>
+    <a href="/">校园场馆官网 →</a>
+  </footer>
+</div>
+
+<div class="lightbox" id="lb"><img alt=""></div>
+
+<script>
+const GROUPS = {
+  g1: [
+    ['bones-side', '骨骼结构 · 侧视'],
+    ['posed-side', '摆动姿态 · 侧视'],
+    ['rig-top', '摆动姿态 · 俯视'],
+  ],
+  g2: [
+    ['cc-34front', '部位染色 · 前 3/4'],
+    ['cc-side', '部位染色 · 侧视'],
+    ['cc-top', '部位染色 · 俯视'],
+    ['feet-34', '足部权重 · 3/4'],
+    ['feet-side', '足部权重 · 侧视'],
+    ['rig-legs', '仅保留下肢骨骼'],
+  ],
+  g3: [
+    ['geo-side', '几何检查 · 侧视'],
+    ['geo-34', '几何检查 · 3/4'],
+    ['view-top', '整体 · 俯视'],
+  ],
+};
+
+for (const [id, items] of Object.entries(GROUPS)) {
+  const box = document.getElementById(id);
+  box.innerHTML = items.map(([name, cap]) => `
+    <figure data-src="img/${name}.jpg">
+      <img src="img/${name}.jpg" alt="${cap}" loading="lazy" width="720" height="456">
+      <figcaption>${cap}</figcaption>
+    </figure>`).join('');
+}
+
+const lb = document.getElementById('lb');
+const lbImg = lb.querySelector('img');
+document.addEventListener('click', (e) => {
+  const fig = e.target.closest('figure');
+  if (fig) { lbImg.src = fig.dataset.src; lb.classList.add('on'); }
+  else if (e.target === lb || e.target === lbImg) { lb.classList.remove('on'); }
+});
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') lb.classList.remove('on'); });
+</script>
+</body>
+</html>

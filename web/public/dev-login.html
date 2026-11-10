@@ -1,0 +1,27 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><title>开发登录</title></head>
+<body style="font-family:system-ui;padding:40px">
+<p>正在用 <code>student</code> 登录…</p>
+<pre id="out"></pre>
+<script>
+(async () => {
+  const out = document.getElementById('out')
+  try {
+    const r = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: new URLSearchParams(location.search).get('u') === 'admin' ? 'admin' : 'student', password: new URLSearchParams(location.search).get('u') === 'admin' ? 'admin123' : '123456' }),
+    })
+    const j = await r.json()
+    if (j.code !== 0) throw new Error(j.msg)
+    localStorage.setItem('vb_token', j.data.token)
+    out.textContent = '登录成功：' + j.data.user.name + '，2 秒后跳转…'
+    setTimeout(() => location.href = '/admin/dashboard', 800)
+  } catch (e) {
+    out.textContent = '失败：' + e.message
+  }
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,52 @@
+﻿services:
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASS:?请设置 DB_PASS（强口令）}
+      MYSQL_DATABASE: venue_booking
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_general_ci
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-p${DB_PASS}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  migrate:
+    build: ./server
+    command: ["node", "src/migrate.js"]
+    environment: &env
+      NODE_ENV: production
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: root
+      DB_PASS: ${DB_PASS:?请设置 DB_PASS（强口令）}
+      DB_NAME: venue_booking
+      JWT_SECRET: ${JWT_SECRET:?请设置 JWT_SECRET（至少 32 位随机串，可用 openssl rand -hex 32 生成）}
+      CORS_ORIGINS: http://localhost:8080
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  server:
+    build: ./server
+    environment: *env
+    volumes:
+      - uploads:/app/uploads
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  web:
+    build: ./web
+    ports:
+      - "8080:80"
+    depends_on:
+      - server
+    restart: unless-stopped
+
+volumes:
+  mysql-data:
+  uploads:
